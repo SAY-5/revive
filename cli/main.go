@@ -124,9 +124,11 @@ Example:
 
 func buildDefaultConfigPath() string {
 	var result string
-	var homeDirFile string
+	var configDirFile, homeDirFile string
 	configFileName := "revive.toml"
-	configDirFile := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), configFileName)
+	if configDir := os.Getenv("XDG_CONFIG_HOME"); configDir != "" {
+		configDirFile = filepath.Join(configDir, configFileName)
+	}
 
 	if homeDir, err := os.UserHomeDir(); err == nil {
 		homeDirFile = filepath.Join(homeDir, configFileName)

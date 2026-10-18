@@ -28,7 +28,7 @@ type reviveResult struct {
 	stderr   string
 }
 
-func runRevive(t *testing.T, homeConfig, xdgConfig string, args ...string) reviveResult {
+func runRevive(t *testing.T, homeConfig, xdgConfig string, unsetXDG bool, args ...string) reviveResult {
 	t.Helper()
 
 	self, err := os.Executable()
@@ -41,7 +41,10 @@ func runRevive(t *testing.T, homeConfig, xdgConfig string, args ...string) reviv
 	home, xdg := t.TempDir(), t.TempDir()
 	writeConfig(t, home, homeConfig)
 	writeConfig(t, xdg, xdgConfig)
-	cmd.Env = []string{"REVIVE_E2E_RUN_REVIVE=1", "HOME=" + home, "USERPROFILE=" + home, "XDG_CONFIG_HOME=" + xdg}
+	cmd.Env = []string{"REVIVE_E2E_RUN_REVIVE=1", "HOME=" + home, "USERPROFILE=" + home}
+	if !unsetXDG {
+		cmd.Env = append(cmd.Env, "XDG_CONFIG_HOME="+xdg)
+	}
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
@@ -80,6 +83,7 @@ func TestRevive(t *testing.T) {
 		args         []string
 		homeConfig   string // revive.toml in $HOME
 		xdgConfig    string // revive.toml in $XDG_CONFIG_HOME
+		unsetXDG     bool   // run without XDG_CONFIG_HOME in the environment
 		wantExitCode int
 		wantStdout   []string // substrings; no entry means stdout must be empty
 		wantStderr   []string // substrings
@@ -139,6 +143,15 @@ severity = "error"`,
 severity = "error"`,
 			args:         []string{"bad.go"},
 			wantExitCode: 5,
+			wantStdout:   []string{"exported function Bad should have comment or be unexported"},
+		},
+		{
+			name:     "config from $HOME when $XDG_CONFIG_HOME is unset",
+			unsetXDG: true,
+			homeConfig: `warning-code = 3
+[rule.exported]`,
+			args:         []string{"bad.go"},
+			wantExitCode: 3,
 			wantStdout:   []string{"exported function Bad should have comment or be unexported"},
 		},
 		{
@@ -233,7 +246,7 @@ severity = "error"`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := runRevive(t, tt.homeConfig, tt.xdgConfig, tt.args...)
+			got := runRevive(t, tt.homeConfig, tt.xdgConfig, tt.unsetXDG, tt.args...)
 
 			if got.exitCode != tt.wantExitCode {
 				t.Errorf("exit code = %d, want %d\nstdout: %s\nstderr: %s", got.exitCode, tt.wantExitCode, got.stdout, got.stderr)

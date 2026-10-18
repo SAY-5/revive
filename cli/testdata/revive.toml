@@ -1,0 +1,4 @@
+error-code = 7
+
+[rule.exported]
+severity = "error"
